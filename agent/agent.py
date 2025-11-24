@@ -23,6 +23,16 @@ email_parser_agent = LlmAgent(
     tools=[parse_eml_file]
 )
 
+background_check_agent = LlmAgent(
+    model="gemini-2.0-flash",
+    name="background_check_agent",
+    description="Agent runs checks on the domains validity and authenticity. Retrieving the webpages, DNS records and WHOIS records",
+    instruction="""You are an domain verifing agent that verifies the authenticity, validity and credibility of a domain that sent a client an email.""",
+    # input_schema=EmailParseInput,
+    output_schema=EmailContent,
+    tools=[parse_eml_file]
+)
+
 root_agent = Agent(
     model='gemini-2.0-flash', #'gemini-3-pro-preview',
     name='email_fraud_agent',
