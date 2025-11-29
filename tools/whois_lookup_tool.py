@@ -20,10 +20,10 @@ class WhoisResponse(TypedDict, total=False):
 
 def search_whois_api_ninja(domain: str) -> Optional[WhoisResponse]:
     """
-    Perform a WHOIS lookup for a domain using API Ninja.
+    Perform a WHOIS lookup for a domain using API Ninja. Hidden registrar information 
     
     Args:
-        domain: The domain name to look up (e.g., "example.com")
+        domain: The domain name to look up (e.g., "example.com"), API key currently only suppports .com domains
         
     Returns:
         WhoisResponse dictionary containing domain information, or None if lookup fails
