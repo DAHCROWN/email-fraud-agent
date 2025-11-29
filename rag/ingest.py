@@ -12,7 +12,7 @@ from google.cloud.aiplatform_v1.types import (
 )
 
 from embeddings import EmbeddingEngine
-from models import EmailRecord
+from models.datasets import NigerianFraudDataset, SpamAssasinDataset, LingDataset, EmailRecord
 
 
 # -----------------------------
@@ -28,33 +28,76 @@ PROJECT_ID = "YOUR_PROJECT_ID"
 
 
 # -----------------------------
+# DATASET REGISTRY
+# -----------------------------
+DATASET_REGISTRY = {
+    "nigerian_fraud": {
+        "model": NigerianFraudDataset,
+        "path": "datasets/nigerian_fraud.csv",
+    },
+    "spam_assassin": {
+        "model": SpamAssasinDataset,
+        "path": "datasets/spam_assassin.csv",
+    },
+    "ling_spam": {
+        "model": LingDataset,
+        "path": "datasets/ling_spam.csv",
+    },
+    # Generic fallback dataset
+    "generic": {
+        "model": EmailRecord,
+        "path": None,  # When loading automatically from folder
+    }
+}
+
+
+# -----------------------------
 # Load + Validate CSV Records
 # -----------------------------
-def load_csv_records() -> List[Dict[str, Any]]:
+def load_csv_records() -> List[Any]:
     dataset_path = Path(DATASET_DIR)
     validated = []
 
+    # Load datasets explicitly defined in registry
+    for name, cfg in DATASET_REGISTRY.items():
+        model = cfg["model"]
+        file_path = cfg["path"]
+
+        if file_path:
+            fp = Path(file_path)
+            if fp.exists():
+                print(f"[INGEST] Loading dataset '{name}' from {fp}...")
+                with open(fp, newline='', encoding="utf-8", errors="ignore") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        try:
+                            validated.append(model(**row))
+                        except Exception as e:
+                            print(f"[WARN] Skipping invalid row in {name}: {e}")
+
+    # Auto‑load any other CSV in datasets folder using the generic EmailRecord schema
     for file in dataset_path.glob("*.csv"):
-        print(f"[INGEST] Loading {file}...")
+        # skip files already identified in registry
+        if any(cfg["path"] == str(file) for cfg in DATASET_REGISTRY.values()):
+            continue
+
+        print(f"[INGEST] Auto-loading generic CSV: {file}")
         with open(file, newline='', encoding="utf-8", errors="ignore") as f:
             reader = csv.DictReader(f)
-
             for row in reader:
                 try:
-                    # Pydantic validation
-                    record = EmailRecord(**row)
-                    validated.append(record)
+                    validated.append(EmailRecord(**row))
                 except Exception as e:
-                    print(f"[WARN] Skipping invalid row: {e}")
+                    print(f"[WARN] Skipping invalid generic row: {e}")
 
-    print(f"[INGEST] Loaded {len(validated)} valid rows.")
+    print(f"[INGEST] Loaded {len(validated)} validated rows from all datasets.")
     return validated
 
 
 # -----------------------------
 # Build Vertex Datapoints
 # -----------------------------
-def build_vertex_datapoints(records: List[EmailRecord], embeddings: List[List[float]]):
+def build_vertex_datapoints(records: List[Any], embeddings: List[List[float]]):
     datapoints = []
 
     for record, vector in zip(records, embeddings):
